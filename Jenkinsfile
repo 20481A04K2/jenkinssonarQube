@@ -20,13 +20,16 @@ pipeline {
 
     stage('SonarQube Analysis') {
       steps {
-        withSonarQubeEnv('My SonarQube Server') {
-          sh """
-            ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
-              -Dsonar.projectKey=flask-app \
-              -Dsonar.sources=. \
-              -Dsonar.host.url=http://34.63.76.155:9000
-          """
+        withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
+          withSonarQubeEnv('My SonarQube Server') {
+            sh """
+              ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                -Dsonar.projectKey=flask-app \
+                -Dsonar.sources=. \
+                -Dsonar.host.url=http://34.63.76.155:9000 \
+                -Dsonar.login=$SONAR_TOKEN
+            """
+          }
         }
       }
     }
