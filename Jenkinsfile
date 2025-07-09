@@ -8,12 +8,26 @@ pipeline {
     IMAGE_NAME = 'flask-app'
     IMAGE_TAG = 'latest'
     AR_URL = "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
+    SONAR_SCANNER_HOME = tool 'Default Sonar Scanner'
   }
 
   stages {
     stage('Checkout') {
       steps {
         checkout scm
+      }
+    }
+
+    stage('SonarQube Analysis') {
+      steps {
+        withSonarQubeEnv('My SonarQube Server') {
+          sh """
+            ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+              -Dsonar.projectKey=flask-app \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=http://34.63.76.155:9000
+          """
+        }
       }
     }
 
@@ -25,15 +39,18 @@ pipeline {
 
     stage('Push to Artifact Registry') {
       steps {
-        sh '''
-          gcloud config set project $PROJECT_ID
-          gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
-          docker push $AR_URL
-        '''
+        withCredentials([file(credentialsId: 'gcp-sa-key', variable: 'GOOGLE_APPLICATION_CREDENTIALS')]) {
+          sh '''
+            gcloud auth activate-service-account --key-file=$GOOGLE_APPLICATION_CREDENTIALS
+            gcloud config set project $PROJECT_ID
+            gcloud auth configure-docker $REGION-docker.pkg.dev --quiet
+            docker push $AR_URL
+          '''
+        }
       }
     }
 
-    stage('Run Docker Image') {
+    stage('Run Docker Image on Jenkins VM') {
       steps {
         sh '''
           docker stop flask-container || true
